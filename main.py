@@ -5,7 +5,7 @@ import re
 #Establecer conexión con la base de datos
 def connection():
     try:
-        connection = connect(host='localhost',database='BaseTaller2',user='postgres', password='aparatos', port='5432')
+        connection = connect(host='localhost',database='BaseTaller2',user='postgres', password='postgres', port='5432')
         connection.autocommit = True # Autocommit es un método que permite que cada sentencia sql se ejecute en una transacción
         return connection
     except(Exception, Error) as error:

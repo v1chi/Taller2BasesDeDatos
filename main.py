@@ -1,6 +1,8 @@
 import psycopg2
 from psycopg2 import connect, Error
+import re
 
+#Establecer conexión con la base de datos
 def connection():
     try:
         connection = connect(host='localhost',database='BaseTaller2',user='postgres', password='aparatos', port='5432')
@@ -12,35 +14,21 @@ def connection():
         cursor.close() # Cerramos el objetos cursor para (Cursor permite ejecutar los comandos sql)
         return None
     
-
-def select_query(query, data=[]):
-    try:
-        if connection() and query != '' and data == []:
-            cursor = connection().cursor()
-            cursor.execute(query)
-            result = cursor.fetchall()
-            return result
-        elif connection() and query != '' and data != []:
-            cursor = connection().cursor()
-            cursor.execute(query, tuple(data))
-            result = cursor.fetchall()
-            return result
-    except(Exception, Error) as error:
-        print("Error: %s" % error)
-        connection.rollback()
-
+#Función para crear la tabla de usuarios
 def create_users_table():
     try:
         conn = connection()
         cursor = conn.cursor()
         create_table_query = """
-        CREATE TABLE users (
-            username text UNIQUE,
-            password text
+        CREATE TABLE if not exists usuarios (
+            username text primary key,
+            password text NOT NULL,
+            role text NOT NULL
         );
         """
         cursor.execute(create_table_query)
         conn.commit()
+        print("Tabla de usuarios creada")
     except psycopg2.Error as e:
         print("Error al crear la tabla de usuarios:", e)
     finally:
@@ -48,97 +36,128 @@ def create_users_table():
             conn.close()
 
 # Función para crear la tabla de productos
-def create_products_table(connection):
+def create_products_table():
     try:
-        cursor = connection.cursor()
+        cursor = connection().cursor()
         create_table_query = """
         CREATE TABLE IF NOT EXISTS productos (
-            id SERIAL PRIMARY KEY,
-            nombre VARCHAR(255),
-            descripcion TEXT,
-            precio DECIMAL,
-            cantidad_stock INT
+            nombre text primary key,
+            descripcion text NOT NULL,
+            precio int NOT NULL,
+            cantidad_stock int NOT NULL
         );
         """
         cursor.execute(create_table_query)
-        connection.commit()
+        connection().commit()
         print("Tabla de productos creada exitosamente.")
     except psycopg2.Error as e:
         print("Error al crear la tabla de productos:", e)
 
 # Función para crear la tabla de ventas
-def create_ventas_table(connection):
+def create_ventas_table():
     try:
-        cursor = connection.cursor()
+        cursor = connection().cursor()
         create_table_query = """
         CREATE TABLE IF NOT EXISTS ventas (
-            id SERIAL PRIMARY KEY,
-            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            cliente_id INT,
-            FOREIGN KEY (cliente_id) REFERENCES clientes(id)
+            id int PRIMARY KEY,
+            cliente text REFERENCES clientes(username) NOT NULL,
+            producto text references productos(nombre) NOT NULL,
+            cantidad int NOT NULL
         );
         """
         cursor.execute(create_table_query)
-        connection.commit()
+        connection().commit()
         print("Tabla de ventas creada exitosamente.")
     except psycopg2.Error as e:
         print("Error al crear la tabla de ventas:", e)
 
 # Función para crear la tabla de clientes
-def create_clientes_table(connection):
+def create_clientes_table():
     try:
-        cursor = connection.cursor()
+        cursor = connection().cursor()
         create_table_query = """
         CREATE TABLE IF NOT EXISTS clientes (
-            id SERIAL PRIMARY KEY,
-            nombre VARCHAR(255),
-            direccion TEXT,
-            email VARCHAR(255) UNIQUE
+            username text primary key references usuarios(username),
+            nombre text NOT NULL,
+            direccion TEXT NOT NULL,
+            email text NOT NULL
         );
         """
         cursor.execute(create_table_query)
-        connection.commit()
+        connection().commit()
         print("Tabla de clientes creada exitosamente.")
     except psycopg2.Error as e:
         print("Error al crear la tabla de clientes:", e)
 
-# Función para crear la tabla de inventario
-def create_inventario_table(connection):
-    try:
-        cursor = connection.cursor()
-        create_table_query = """
-        CREATE TABLE IF NOT EXISTS inventario (
-            id SERIAL PRIMARY KEY,
-            producto_id INT,
-            cantidad_stock INT,
-            FOREIGN KEY (producto_id) REFERENCES productos(id)
-        );
-        """
-        cursor.execute(create_table_query)
-        connection.commit()
-        print("Tabla de inventario creada exitosamente.")
-    except psycopg2.Error as e:
-        print("Error al crear la tabla de inventario:", e)
+#Funcion para verificar si la contraseña es válida
+def is_valid_password(password):
+    # La contraseña debe tener entre 6 y 8 caracteres
+    if len(password) < 6 or len(password) > 8:
+        return False
+    # Al menos una letra mayúscula
+    if not re.search("[A-Z]", password):
+        return False
+    #n Al menos un número 
+    if not re.search("[0-9]", password):
+        return False
+    # Al menos un carácter especial
+    if not re.search("[^A-Za-z0-9]", password):
+        return False
+    return True
 
-def register_new_user(conn):
-    username = input("Ingrese un nombre de usuario nuevo: ")
-    password = input("Ingrese una contraseña nueva: ")
+#Ingresar un cliente en la base de datos
+def register_client(username, email, direccion, nombre, conn):
     try:
-        insert_query = "INSERT INTO users (username, password) VALUES (%s, %s)"
+        insert_query = "INSERT INTO clientes (username, nombre, email, direccion) VALUES (%s, %s, %s, %s)"
         cursor = conn.cursor()
-        cursor.execute(insert_query, (username, password))
+        cursor.execute(insert_query, (username, nombre, email, direccion))
+        conn.commit()
+        print("Cliente registrado exitosamente.")
+    except psycopg2.Error as e:
+        print("Error al registrar cliente:", e)
+    finally:
+        if conn:
+            conn.close()
+
+#Registrar un usuario en la base de datos
+def register_new_user(conn):
+    #Se pide el nombre de usuario, contraseña y rol del usuario
+    username = input("Ingrese un nombre de usuario: ")
+    password = input("Ingrese una contraseña: ")
+    role = input("Ingrese el rol (administrador/cliente): ")
+
+    try:
+        #Si la contraseña no es válida, se indica que hubi un error
+        if not is_valid_password(password):
+            print("La contraseña no cumple con los requisitos.")
+            return
+        #Si la contraseña es válida, se registra el usuario
+        if role != "cliente" and role != "administrador":
+            print("El rol no es valido")
+            return
+
+        insert_query = "INSERT INTO usuarios (username, password, role) VALUES (%s, %s, %s)"
+        cursor = conn.cursor()
+        cursor.execute(insert_query, (username, password, role))
         conn.commit()
         print("Usuario registrado exitosamente.")
+
+        #Además, si el usuario es de tipo cliente, se pide su nombre y sus datos de contacto y se registra como cliente
+        if role == "cliente":
+            nombre = input("Ingrese su nombre: ")
+            email = input("Ingrese su email: ")
+            direccion = input("Ingrese su dirección: ")
+            register_client(username, email, direccion, nombre, conn)
     except psycopg2.Error as e:
-        print("Error al registrar usuario:", e)
+        print("Error al registrar usuario:", e) 
 
-
+#Inicio de sesion
 def login():
     username = input("Ingrese su nombre de usuario: ")
     password = input("Ingrese su contraseña: ")
     try:
         conn = connection()
-        select_query = "SELECT * FROM users WHERE username = %s AND password = %s"
+        select_query = "SELECT * FROM usuarios WHERE username = %s AND password = %s"
         cursor = conn.cursor()
         cursor.execute(select_query, (username, password))
         user = cursor.fetchone()
@@ -153,10 +172,21 @@ def login():
         if conn:
             conn.close()
 
-create_users_table()
 
-admin_username = "camilo@tienda.com"
-admin_password = "camilo@7720"
 
 if connection():
+    """
+    #Crear tablas:
+    create_users_table()
+    create_clientes_table()
+    create_products_table()
+    create_ventas_table()
+
+    #Añadir a la tabla de usuarios a camilo@tienda.com:
+    insert_query = "INSERT INTO usuarios (username, password, role) VALUES (%s, %s, %s)"
+    conn = connection()
+    cursor = conn.cursor()
+    cursor.execute(insert_query, ("camilo@tienda.com", "camilo@7720", "administrador"))
+    conn.commit()
+    """
     login()

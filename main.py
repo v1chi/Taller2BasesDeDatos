@@ -5,7 +5,7 @@ import re
 #Establecer conexión con la base de datos
 def connection():
     try:
-        connection = connect(host='localhost',database='BaseTaller2',user='postgres', password='postgres', port='5432')
+        connection = connect(host='localhost',database='BaseTaller2',user='postgres', password='aparatos', port='5432')
         connection.autocommit = True # Autocommit es un método que permite que cada sentencia sql se ejecute en una transacción
         return connection
     except(Exception, Error) as error:
@@ -13,7 +13,23 @@ def connection():
         connection.rollback() # Reversion de una transaccion incompleta o fallida
         cursor.close() # Cerramos el objetos cursor para (Cursor permite ejecutar los comandos sql)
         return None
-    
+
+def select_query(query, data=[]):
+    try:
+        if connection() and query != '' and data == []:
+            cursor = connection().cursor()
+            cursor.execute(query)
+            result = cursor.fetchall()
+            return result
+        elif connection() and query != '' and data != []:
+            cursor = connection().cursor()
+            cursor.execute(query, tuple(data))
+            result = cursor.fetchall()
+            return result
+    except(Exception, Error) as error:
+        print("Error: %s" % error)
+        connection.rollback()
+
 #Función para crear la tabla de usuarios
 def create_users_table():
     try:
@@ -60,7 +76,7 @@ def create_ventas_table():
         create_table_query = """
         CREATE TABLE IF NOT EXISTS ventas (
             id int PRIMARY KEY,
-            cliente text REFERENCES clientes(username) NOT NULL,
+            cliente text REFERENCES clientes(username),
             producto text references productos(nombre) NOT NULL,
             cantidad int NOT NULL
         );
@@ -151,6 +167,109 @@ def register_new_user(conn):
     except psycopg2.Error as e:
         print("Error al registrar usuario:", e) 
 
+def registrarProducto():
+    nombre = input("Ingrese el nombre del producto")
+    descripcion = input("Ingrese la descripcion del producto")
+    precio = input("Ingrese el precio del producto")
+    cantidad_stock = input("Ingrese la cantidad de stock del producto")
+
+    try:
+        if not precio.isdigit() and not cantidad_stock.isdigit():
+            print("Ingrese valores correctos para el precio y el stock (tienen que ser numeros enteros)")
+            return
+        insert_query = "INSERT INTO productos (nombre, descripcion, precio, cantidad_stock) VALUES (%s, %s, %s, %s)"
+        cursor = connection().cursor()
+        cursor.execute(insert_query, (nombre, descripcion, precio, cantidad_stock))
+        connection().commit()
+        print("Producto registrado exitosamente.")
+    except psycopg2.Error as e:
+        print("Error al registrar prodructo:", e)
+    finally:
+        if connection():
+            connection().close()
+
+
+def obtener_ultimo_id():
+    cursor = connection().cursor()
+    cursor.execute("SELECT MAX(id) FROM ventas;")
+    ultimo_id = cursor.fetchone()[0]
+    connection().close()
+    return ultimo_id if ultimo_id is not None else 0
+
+
+def registrarVenta(producto, cantidad):
+    try:
+        conn = connection()
+        cursor = conn.cursor()
+        # Verificar si el producto existe y hay suficiente cantidad en stock
+        select_query = "SELECT cantidad_stock FROM productos WHERE nombre = %s"
+        cursor.execute(select_query, (producto,))
+        cantidad_stock = cursor.fetchone()
+        
+        
+        if cantidad_stock and cantidad_stock[0] >= cantidad:
+            # Restar la cantidad vendida del stock del producto
+            update_query = "UPDATE productos SET cantidad_stock = cantidad_stock - %s WHERE nombre = %s"
+            cursor.execute(update_query, (cantidad, producto))
+
+            nuevo_id = obtener_ultimo_id() + 1
+            
+            # Insertar la venta en la tabla de ventas
+            insert_query = "INSERT INTO ventas (id, producto, cantidad) VALUES (%s, %s, %s)"
+            cursor.execute(insert_query, (nuevo_id, producto, cantidad))
+            conn.commit()
+            print("Venta registrada exitosamente.")
+        else:
+            print("Producto no disponible en la cantidad solicitada.")
+        
+    except psycopg2.Error as e:
+        print("Error al registrar venta:", e)
+    finally:
+        if conn:
+            conn.close()
+
+#Menu administrador
+def menuAdministrador(user):
+    print("Menu administrador:")
+    print("1. Registrar nuevo producto")
+    print("2. Ver información de un producto")
+    print("3. Actualizar inventario")
+    print("4. Ver informe de productos bajos en stock")
+    print("5. Registrar una venta")
+    print("6. Ver historial de ventas")
+    print("7. Salir")
+    opcion = input("Seleccione una opcion: ")
+
+    while(opcion != "7"):
+        if opcion == "1":
+            registrarProducto()
+
+        elif opcion == "2":
+            producto = input("Ingrese el nombre del producto: ")
+            query = "SELECT * FROM productos WHERE nombre = %s"
+            cursor = connection().cursor()
+            cursor.execute(query, (producto,))
+            print(cursor.fetchall())
+
+        elif opcion == "3":
+            pass
+
+        elif opcion == "4":
+            print(select_query("select * from productos where cantidad_stock < 10"))
+
+        elif opcion == "5":
+            producto = input("Ingrese el nombre del producto: ")
+            cantidad = int(input("Ingrese la cantidad a comprar: "))
+            registrarVenta(producto, cantidad)
+
+        elif opcion == "6":
+            print(select_query("select * from ventas"))
+
+        else:
+            print("Ingrese una opcion valida")
+
+        opcion = input("Seleccione una opcion: ")
+
 #Inicio de sesion
 def login():
     username = input("Ingrese su nombre de usuario: ")
@@ -162,7 +281,13 @@ def login():
         cursor.execute(select_query, (username, password))
         user = cursor.fetchone()
         if user:
-            print("Sesión iniciada.")
+            # Verificar el rol del usuario
+            if user[2] == "administrador":
+                print("Bienvenido administrador.")
+                menuAdministrador(user)
+            elif user[2] == "cliente":
+                print("Bienvenido cliente.")
+                # Coloca aquí el código para las acciones de un cliente
         else:
             print("Usuario no existe. Por favor, regístrese.")
             register_new_user(conn)
@@ -175,18 +300,4 @@ def login():
 
 
 if connection():
-    """
-    #Crear tablas:
-    create_users_table()
-    create_clientes_table()
-    create_products_table()
-    create_ventas_table()
-
-    #Añadir a la tabla de usuarios a camilo@tienda.com:
-    insert_query = "INSERT INTO usuarios (username, password, role) VALUES (%s, %s, %s)"
-    conn = connection()
-    cursor = conn.cursor()
-    cursor.execute(insert_query, ("camilo@tienda.com", "camilo@7720", "administrador"))
-    conn.commit()
-    """
     login()

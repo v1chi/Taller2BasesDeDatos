@@ -5,7 +5,7 @@ import re
 #Establecer conexión con la base de datos
 def connection():
     try:
-        connection = connect(host='localhost',database='BaseTaller2',user='postgres', password='aparatos', port='5432')
+        connection = connect(host='localhost',database='BaseTaller2',user='postgres', password='postgres', port='5432')
         connection.autocommit = True # Autocommit es un método que permite que cada sentencia sql se ejecute en una transacción
         return connection
     except(Exception, Error) as error:
@@ -188,23 +188,15 @@ def obtener_ultimo_id():
     conn.close()
     return ultimo_id if ultimo_id is not None else 0
 
-#Administrador registra una nueva venta
-def registrar_venta():
-    producto = input("Ingrese el nombre del producto: ")
-    cant = input("Ingrese la cantidad a comprar: ")
+#Registrar una venta
+def registrar_venta(producto, cantidad, cliente=None):
     try:
-        if not cant.isdigit():
-            print("Ingrese una cantidad válida")
-            return
-        
-        cantidad = int(cant)
         conn = connection()
         cursor = conn.cursor()
         # Verificar si el producto existe y hay suficiente cantidad en stock
         select_query = "SELECT cantidad_stock FROM productos WHERE nombre = %s"
         cursor.execute(select_query, (producto,))
         cantidad_stock = cursor.fetchone()
-        
         
         if cantidad_stock and cantidad_stock[0] >= cantidad:
             # Restar la cantidad vendida del stock del producto
@@ -214,12 +206,12 @@ def registrar_venta():
             nuevo_id = obtener_ultimo_id() + 1
             
             # Insertar la venta en la tabla de ventas
-            insert_query = "INSERT INTO ventas (id, producto, cantidad) VALUES (%s, %s, %s)"
-            cursor.execute(insert_query, (nuevo_id, producto, cantidad))
+            insert_query = "INSERT INTO ventas (id, producto, cantidad, cliente) VALUES (%s, %s, %s, %s)"
+            cursor.execute(insert_query, (nuevo_id, producto, cantidad, cliente))
             conn.commit()
             print("Venta registrada exitosamente.")
         else:
-            print("Producto no disponible en la cantidad solicitada.")
+            print("Producto no disponible.")
         
     except psycopg2.Error as e:
         print("Error al registrar venta:", e)
@@ -356,7 +348,7 @@ def actualizar_inventario():
             conn.close()
 
 #Menu administrador
-def menu_administrador(user):
+def menu_administrador():
     print("Menu administrador:")
     print("1. Registrar nuevo producto")
     print("2. Ver información de un producto")
@@ -381,10 +373,110 @@ def menu_administrador(user):
             obtener_producto_bajo_stock()
 
         elif opcion == "5":
-            registrar_venta()
+            producto = input("Ingrese el nombre del producto: ")
+            cant = input("Ingrese la cantidad a comprar: ")
+            if not cant.isdigit():
+                print("Ingrese una cantidad válida")
+                continue
+            cantidad = int(cant)
+            registrar_venta(producto, cantidad)  # Cliente será NULL
 
         elif opcion == "6":
             obtener_registro_ventas()
+
+        else:
+            print("Ingrese una opcion valida")
+
+        opcion = input("Seleccione una opcion: ")
+
+#Ver informacion personal del cliente
+def ver_informacion_personal(user):
+    try:
+        username = user[0]
+        conn = connection()
+        cursor = conn.cursor()
+
+        # Consulta para obtener la información personal del cliente
+        select_query = "SELECT nombre, email, direccion FROM clientes WHERE username = %s"
+        cursor.execute(select_query, (username,))
+        cliente_info = cursor.fetchone()
+
+        if cliente_info:
+            print(f"Nombre: {cliente_info[0]}")
+            print(f"Email: {cliente_info[1]}")
+            print(f"Dirección: {cliente_info[2]}")
+        else:
+            print("No se encontró información del cliente.")
+
+    except psycopg2.Error as e:
+        print("Error al obtener la información personal:", e)
+    finally:
+        if conn:
+            conn.close()
+
+#Ver todos los productos
+def ver_catalogo_productos():
+    try:
+        conn = connection()
+        cursor = conn.cursor()
+
+        # Mostrar todos los productos disponibles
+        select_query = "SELECT nombre, descripcion, precio, cantidad_stock FROM productos"
+        cursor.execute(select_query)
+        productos = cursor.fetchall()
+        print("Catálogo de productos:")
+        for producto in productos:
+            print(f"Nombre: {producto[0]}, Descripción: {producto[1]}, Precio: {producto[2]}, Cantidad en stock: {producto[3]}")
+
+    except psycopg2.Error as e:
+        print("Error al realizar la compra:", e)
+    finally:
+        if conn:
+            conn.close()
+
+#Cliente realiza una compra
+def realizar_compra(user):
+    try:
+        conn = connection()
+        cursor = conn.cursor()
+
+        while True:
+            producto = input("Ingrese el nombre del producto que desea comprar (o 'salir' para terminar): ")
+            if producto.lower() == 'salir':
+                break
+
+            cant = input("Ingrese la cantidad que desea comprar: ")
+            if not cant.isdigit():
+                print("Por favor, ingrese un número válido para la cantidad.")
+                continue
+
+            cantidad = int(cant)
+            registrar_venta(producto, cantidad, user[0])
+
+    except psycopg2.Error as e:
+        print("Error al realizar la compra:", e)
+    finally:
+        if conn:
+            conn.close()
+
+#Menu cliente
+def menu_cliente(user):
+    print("Menu cliente:")
+    print("1. Ver información personal")
+    print("2. Ver catálogo de productos")
+    print("3. Realizar una compra")
+    print("4. Salir del sistema")
+    opcion = input("Seleccione una opcion: ")
+
+    while(opcion != "4"):
+        if opcion == "1":
+            ver_informacion_personal(user)
+
+        elif opcion == "2":
+            ver_catalogo_productos()
+            
+        elif opcion == "3":
+            realizar_compra(user)
 
         else:
             print("Ingrese una opcion valida")
@@ -405,10 +497,10 @@ def login():
             # Verificar el rol del usuario
             if user[2] == "administrador":
                 print("Bienvenido administrador.")
-                menu_administrador(user)
+                menu_administrador()
             elif user[2] == "cliente":
                 print("Bienvenido cliente.")
-                # Coloca aquí el código para las acciones de un cliente
+                menu_cliente(user)
         else:
             print("Usuario no existe. Por favor, regístrese.")
             register_new_user()

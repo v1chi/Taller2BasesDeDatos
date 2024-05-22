@@ -481,6 +481,11 @@ def menu_cliente(user):
         else:
             print("Ingrese una opcion valida")
 
+        print("Menu cliente:")
+        print("1. Ver información personal")
+        print("2. Ver catálogo de productos")
+        print("3. Realizar una compra")
+        print("4. Salir del sistema")
         opcion = input("Seleccione una opcion: ")
 
 #Inicio de sesion
@@ -489,21 +494,27 @@ def login():
     password = input("Ingrese su contraseña: ")
     try:
         conn = connection()
-        select_query = "SELECT * FROM usuarios WHERE username = %s AND password = %s"
+        select_query = "SELECT * FROM usuarios WHERE username = %s"
         cursor = conn.cursor()
-        cursor.execute(select_query, (username, password))
+        cursor.execute(select_query, (username,))
         user = cursor.fetchone()
         if user:
-            # Verificar el rol del usuario
-            if user[2] == "administrador":
-                print("Bienvenido administrador.")
-                menu_administrador()
-            elif user[2] == "cliente":
-                print("Bienvenido cliente.")
-                menu_cliente(user)
+            if user[1] == password:
+                # Verificar el rol del usuario
+                if user[2] == "administrador":
+                    print("Bienvenido administrador.")
+                    menu_administrador()
+                elif user[2] == "cliente":
+                    print("Bienvenido cliente.")
+                    menu_cliente(user)
+            else:
+                    # Contraseña incorrecta
+                    print("Contraseña incorrecta. Por favor, intente nuevamente.")
+                    login()
         else:
             print("Usuario no existe. Por favor, regístrese.")
             register_new_user()
+            login()
     except psycopg2.Error as e:
         print("Error al iniciar sesión:", e)
     finally:

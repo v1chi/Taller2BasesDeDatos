@@ -100,7 +100,7 @@ def is_valid_password(password):
     # Al menos una letra mayúscula
     if not re.search("[A-Z]", password):
         return False
-    #n Al menos un número 
+    # Al menos un número 
     if not re.search("[0-9]", password):
         return False
     # Al menos un carácter especial
@@ -131,15 +131,16 @@ def register_new_user():
     role = input("Ingrese el rol (administrador/cliente): ")
 
     try:
-        #Si la contraseña no es válida, se indica que hubi un error
+        #Si la contraseña no es válida, se indica que hubo un error
         if not is_valid_password(password):
             print("La contraseña no cumple con los requisitos.")
             return
-        #Si la contraseña es válida, se registra el usuario
+        #Si el rol no es cliente o administrador, se indica que no es valido
         if role != "cliente" and role != "administrador":
             print("El rol no es valido")
             return
 
+        #Si la contraseña y el rol son validos, se crea el usuario
         insert_query = "INSERT INTO usuarios (username, password, role) VALUES (%s, %s, %s)"
         conn = connection()
         cursor = conn.cursor()
@@ -147,7 +148,7 @@ def register_new_user():
         conn.commit()
         print("Usuario registrado exitosamente.")
 
-        #Además, si el usuario es de tipo cliente, se pide su nombre y sus datos de contacto y se registra como cliente
+        #Además, si el usuario es de tipo cliente, se pide su nombre y sus datos de contacto (email y direccion) y se registra como cliente
         if role == "cliente":
             nombre = input("Ingrese su nombre: ")
             email = input("Ingrese su email: ")
@@ -158,15 +159,18 @@ def register_new_user():
 
 #Registrar un nuevo producto
 def registrar_producto():
+    #Se pide el nombre, descripcion, precio y cantidad de stock del producto
     nombre = input("Ingrese el nombre del producto: ")
     descripcion = input("Ingrese la descripcion del producto: ")
     precio = input("Ingrese el precio del producto: ")
     cantidad_stock = input("Ingrese la cantidad de stock del producto: ")
 
     try:
+        #Si el precio no es un numero o si la cantidad de stock no es un numero, se indica que hubo un error
         if not precio.isdigit() and not cantidad_stock.isdigit():
             print("Ingrese valores correctos para el precio y el stock (tienen que ser numeros enteros)")
             return
+        #Si el precio y stock estan bien, se ingresa el producto
         insert_query = "INSERT INTO productos (nombre, descripcion, precio, cantidad_stock) VALUES (%s, %s, %s, %s)"
         conn = connection()
         cursor = conn.cursor()
@@ -181,28 +185,32 @@ def registrar_producto():
 
 #Obtener el ultimo id asignado a una venta
 def obtener_ultimo_id():
+    #Se selecciona el maximo id de venta y se le suma 1
     conn = connection()
     cursor = conn.cursor()
     cursor.execute("SELECT MAX(id) FROM ventas;")
     ultimo_id = cursor.fetchone()[0]
     conn.close()
+    #Si es la primera venta, se retorna 0
     return ultimo_id if ultimo_id is not None else 0
 
 #Registrar una venta
 def registrar_venta(producto, cantidad, cliente):
     try:
+        # Buscar el producto y sacar su cantidad de stock
+        select_query = "SELECT cantidad_stock FROM productos WHERE nombre = %s"
         conn = connection()
         cursor = conn.cursor()
-        # Verificar si el producto existe y hay suficiente cantidad en stock
-        select_query = "SELECT cantidad_stock FROM productos WHERE nombre = %s"
         cursor.execute(select_query, (producto,))
         cantidad_stock = cursor.fetchone()
+
+        #Se verifica si la cantida de stock es no nula y si hay suficiente stock del producto
         if cantidad_stock and cantidad_stock[0] >= cantidad:
+
             # Restar la cantidad vendida del stock del producto
             update_query = "UPDATE productos SET cantidad_stock = cantidad_stock - %s WHERE nombre = %s"
             cursor.execute(update_query, (cantidad, producto))
-
-            nuevo_id = obtener_ultimo_id() + 1
+            nuevo_id = obtener_ultimo_id() + 1 #Crear id de la venta
             
             # Insertar la venta en la tabla de ventas
             insert_query = "INSERT INTO ventas (id, producto, cantidad, cliente) VALUES (%s, %s, %s, %s)"
@@ -230,6 +238,7 @@ def ver_info_producto():
         cursor.execute(query, (producto,))
         producto_info = cursor.fetchone()
 
+        #Se verifica si el producto es no nulo
         if producto_info:
             nombre, descripcion, precio, cantidad_stock = producto_info
             print(f"Nombre: {nombre}")
@@ -250,7 +259,7 @@ def obtener_registro_ventas():
     try:
         conn = connection()
         cursor = conn.cursor()
-        # Consulta para obtener el registro de ventas con el monto total
+        # Consulta para obtener el registro de ventas, calculando el monto total
         query = """
         SELECT v.id, v.cliente, v.producto, v.cantidad, p.precio, (v.cantidad * p.precio) AS monto_total
         FROM ventas v
@@ -259,8 +268,10 @@ def obtener_registro_ventas():
         cursor.execute(query)
         ventas = cursor.fetchall()
         
+        #Se verifica si se encontraron ventas
         if ventas:
             print("Registro de ventas:")
+            #Se obtiene la info de cada venta
             for venta in ventas:
                 id_venta, cliente, producto, cantidad, precio, monto_total = venta
                 print(f"ID Venta: {id_venta}, Nombre cliente: {cliente}, Producto: {producto}, Cantidad: {cantidad}, Precio: {precio}, Monto Total: {monto_total}")
@@ -280,11 +291,12 @@ def obtener_producto_bajo_stock():
         cursor = conn.cursor()
 
         # Consulta para obtener la información del producto
+        #En esta caso el umbral seleccionado fue de 10, es decir los prooductos con menos de 10 unidades en stock se consideran en bajo stock
         query = "SELECT nombre, descripcion, precio, cantidad_stock FROM productos WHERE cantidad_stock < 10"
         cursor.execute(query)
         productos = cursor.fetchall()
         
-        
+        #Se verifica si se encontraron productos en bajo stock
         if productos:
             for producto in productos: 
                 nombre, descripcion, precio, cantidad_stock = producto
@@ -323,14 +335,28 @@ def actualizar_inventario():
             # Solicitar al administrador qué desea actualizar
             opcion = input("¿Qué desea actualizar? (1: Cantidad en stock, 2: Precio): ")
 
+            # Modificar cantidad en stock
             if opcion == "1":
-                nueva_cantidad = int(input("Ingrese la nueva cantidad en stock: "))
+                cantidad = input("Ingrese la nueva cantidad en stock: ")
+                #Se verifica si la cantidad es un numero
+                if not cantidad.isdigit():
+                    print("Ingrese una cantidad valida")
+                    return
+                nueva_cantidad = int(cantidad)
+                #Se actualiza el stock
                 update_query = "UPDATE productos SET cantidad_stock = %s WHERE nombre = %s"
                 cursor.execute(update_query, (nueva_cantidad, producto))
                 conn.commit()
                 print("Cantidad en stock actualizada exitosamente.")
+
+            #Modificar el precio
             elif opcion == "2":
-                nuevo_precio = float(input("Ingrese el nuevo precio: "))
+                precio = input("Ingrese el nuevo precio: ")
+                #Se verifica si el precio es un numero
+                if not precio.isdigit():
+                    print("Ingrese un precio valido")
+                    return
+                nuevo_precio = int (nuevo_precio)
                 update_query = "UPDATE productos SET precio = %s WHERE nombre = %s"
                 cursor.execute(update_query, (nuevo_precio, producto))
                 conn.commit()
@@ -349,19 +375,19 @@ def actualizar_inventario():
 #Cliente realiza una compra
 def realizar_compra(user):
     try:
-        conn = connection()
-        cursor = conn.cursor()
-
+        #Preguntar la cantidad de productos que desea comprar y verificar que sea un valor valido
         cantidad_productos = input("Ingrese la cantidad de productos distintos que desea comprar: ")
         if not cantidad_productos.isdigit():
             print("Por favor, ingrese un número válido para la cantidad de productos distintos.")
             return
         cantidad_productos = int(cantidad_productos)
 
+        #Preguntar por cada producto y cuanto de stock va a comprar
         for i in range(cantidad_productos):
             producto = input("Ingrese el nombre del producto que desea comprar: ")
             cant = input("Ingrese la cantidad que desea comprar: ")
-
+            
+            #Se verifica si la cantidad es un numero mayor a 0
             if not cant.isdigit() or (cant.isdigit() and int(cant) <= 0):
                 print("Por favor, ingrese un número válido para la cantidad.")
                 return
@@ -371,6 +397,19 @@ def realizar_compra(user):
 
     except psycopg2.Error as e:
         print("Error al realizar la compra:", e)
+
+def obtener_cliente():
+    try:
+        cliente = input("Ingrese el nombre de usuario del cliente: ")
+        select_query_usuario = "SELECT username FROM usuarios WHERE username = %s"
+        conn = connection()
+        cursor = conn.cursor()
+        cursor.execute(select_query_usuario, (cliente,))
+        cliente = cursor.fetchone()
+        return cliente
+     
+    except psycopg2.Error as e:
+        print("Error al obtener el registro de ventas:", e)
     finally:
         if conn:
             conn.close()
@@ -401,11 +440,7 @@ def menu_administrador():
             obtener_producto_bajo_stock()
 
         elif opcion == "5":
-            cliente = input("Ingrese el nombre de usuario del cliente: ")
-            select_query_usuario = "SELECT username FROM usuarios WHERE username = %s"
-            cursor = connection().cursor()
-            cursor.execute(select_query_usuario, (cliente,))
-            nombre_cliente = cursor.fetchone()
+            nombre_cliente = obtener_cliente()
             if not nombre_cliente:
                 print("El usuario no fue encontrado")
                 continue

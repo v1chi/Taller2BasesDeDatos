@@ -158,10 +158,10 @@ def register_new_user():
 
 #Registrar un nuevo producto
 def registrar_producto():
-    nombre = input("Ingrese el nombre del producto")
-    descripcion = input("Ingrese la descripcion del producto")
-    precio = input("Ingrese el precio del producto")
-    cantidad_stock = input("Ingrese la cantidad de stock del producto")
+    nombre = input("Ingrese el nombre del producto: ")
+    descripcion = input("Ingrese la descripcion del producto: ")
+    precio = input("Ingrese el precio del producto: ")
+    cantidad_stock = input("Ingrese la cantidad de stock del producto: ")
 
     try:
         if not precio.isdigit() and not cantidad_stock.isdigit():
@@ -189,7 +189,7 @@ def obtener_ultimo_id():
     return ultimo_id if ultimo_id is not None else 0
 
 #Registrar una venta
-def registrar_venta(producto, cantidad, cliente=None):
+def registrar_venta(producto, cantidad, cliente):
     try:
         conn = connection()
         cursor = conn.cursor()
@@ -197,7 +197,6 @@ def registrar_venta(producto, cantidad, cliente=None):
         select_query = "SELECT cantidad_stock FROM productos WHERE nombre = %s"
         cursor.execute(select_query, (producto,))
         cantidad_stock = cursor.fetchone()
-        
         if cantidad_stock and cantidad_stock[0] >= cantidad:
             # Restar la cantidad vendida del stock del producto
             update_query = "UPDATE productos SET cantidad_stock = cantidad_stock - %s WHERE nombre = %s"
@@ -253,7 +252,7 @@ def obtener_registro_ventas():
         cursor = conn.cursor()
         # Consulta para obtener el registro de ventas con el monto total
         query = """
-        SELECT v.id, v.producto, v.cantidad, p.precio, (v.cantidad * p.precio) AS monto_total
+        SELECT v.id, v.cliente, v.producto, v.cantidad, p.precio, (v.cantidad * p.precio) AS monto_total
         FROM ventas v
         JOIN productos p ON v.producto = p.nombre;
         """
@@ -263,8 +262,8 @@ def obtener_registro_ventas():
         if ventas:
             print("Registro de ventas:")
             for venta in ventas:
-                id_venta, producto, cantidad, precio, monto_total = venta
-                print(f"ID Venta: {id_venta}, Producto: {producto}, Cantidad: {cantidad}, Precio: {precio}, Monto Total: {monto_total}")
+                id_venta, cliente, producto, cantidad, precio, monto_total = venta
+                print(f"ID Venta: {id_venta}, Nombre cliente: {cliente}, Producto: {producto}, Cantidad: {cantidad}, Precio: {precio}, Monto Total: {monto_total}")
         else:
             print("No hay ventas registradas.")
         
@@ -347,6 +346,35 @@ def actualizar_inventario():
         if conn:
             conn.close()
 
+#Cliente realiza una compra
+def realizar_compra(user):
+    try:
+        conn = connection()
+        cursor = conn.cursor()
+
+        cantidad_productos = input("Ingrese la cantidad de productos distintos que desea comprar: ")
+        if not cantidad_productos.isdigit():
+            print("Por favor, ingrese un número válido para la cantidad de productos distintos.")
+            return
+        cantidad_productos = int(cantidad_productos)
+
+        for i in range(cantidad_productos):
+            producto = input("Ingrese el nombre del producto que desea comprar: ")
+            cant = input("Ingrese la cantidad que desea comprar: ")
+
+            if not cant.isdigit() or (cant.isdigit() and int(cant) <= 0):
+                print("Por favor, ingrese un número válido para la cantidad.")
+                return
+
+            cantidad = int(cant)
+            registrar_venta(producto, cantidad, user[0])
+
+    except psycopg2.Error as e:
+        print("Error al realizar la compra:", e)
+    finally:
+        if conn:
+            conn.close()
+
 #Menu administrador
 def menu_administrador():
     print("Menu administrador:")
@@ -373,13 +401,15 @@ def menu_administrador():
             obtener_producto_bajo_stock()
 
         elif opcion == "5":
-            producto = input("Ingrese el nombre del producto: ")
-            cant = input("Ingrese la cantidad a comprar: ")
-            if not cant.isdigit():
-                print("Ingrese una cantidad válida")
+            cliente = input("Ingrese el nombre de usuario del cliente: ")
+            select_query_usuario = "SELECT username FROM usuarios WHERE username = %s"
+            cursor = connection().cursor()
+            cursor.execute(select_query_usuario, (cliente,))
+            nombre_cliente = cursor.fetchone()
+            if not nombre_cliente:
+                print("El usuario no fue encontrado")
                 continue
-            cantidad = int(cant)
-            registrar_venta(producto, cantidad)  # Cliente será NULL
+            realizar_compra(nombre_cliente)
 
         elif opcion == "6":
             obtener_registro_ventas()
@@ -387,6 +417,14 @@ def menu_administrador():
         else:
             print("Ingrese una opcion valida")
 
+        print("Menu administrador:")
+        print("1. Registrar nuevo producto")
+        print("2. Ver información de un producto")
+        print("3. Actualizar inventario")
+        print("4. Ver informe de productos bajos en stock")
+        print("5. Registrar una venta")
+        print("6. Ver historial de ventas")
+        print("7. Salir")
         opcion = input("Seleccione una opcion: ")
 
 #Ver informacion personal del cliente
@@ -427,31 +465,6 @@ def ver_catalogo_productos():
         print("Catálogo de productos:")
         for producto in productos:
             print(f"Nombre: {producto[0]}, Descripción: {producto[1]}, Precio: {producto[2]}, Cantidad en stock: {producto[3]}")
-
-    except psycopg2.Error as e:
-        print("Error al realizar la compra:", e)
-    finally:
-        if conn:
-            conn.close()
-
-#Cliente realiza una compra
-def realizar_compra(user):
-    try:
-        conn = connection()
-        cursor = conn.cursor()
-
-        while True:
-            producto = input("Ingrese el nombre del producto que desea comprar (o 'salir' para terminar): ")
-            if producto.lower() == 'salir':
-                break
-
-            cant = input("Ingrese la cantidad que desea comprar: ")
-            if not cant.isdigit():
-                print("Por favor, ingrese un número válido para la cantidad.")
-                continue
-
-            cantidad = int(cant)
-            registrar_venta(producto, cantidad, user[0])
 
     except psycopg2.Error as e:
         print("Error al realizar la compra:", e)

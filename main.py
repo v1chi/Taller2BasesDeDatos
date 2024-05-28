@@ -92,6 +92,141 @@ def create_clientes_table():
     except psycopg2.Error as e:
         print("Error al crear la tabla de clientes:", e)
 
+# Función para poblar la tabla de usuarios
+def poblar_tabla_usuarios():
+    usuarios_data = [
+        ("camilo@tienda.com", "camilo@7720", "administrador"),
+        ("adrian", "poCa12_", "administrador"),
+        ("vichi", "guA_34", "administrador"),
+        ("carlos.p", "Omg43#", "cliente"),
+        ("juannn", "Pa$$w0", "cliente"),
+        ("anita", "Abc123!", "cliente"),
+        ("pedrito", "Xyz789@", "cliente"),
+        ("luisa", "Y0u!r4", "cliente"),
+        ("javelo", "H@ppy5", "cliente"),
+        ("heu.remi", "uCN_2e", "cliente"),
+        ("winteroh", "hawA11_", "cliente"),
+        ("camilo.a", "baSe2!", "cliente"),
+        ("vixo.r", "Qr$456", "cliente"),
+    ]
+    try:
+        conn = connection()
+        cursor = conn.cursor()
+        # En caso de encontrar nombres de usuarios duplicados en alguna tupla, no se inserta.
+        insert_query = """
+        INSERT INTO usuarios (username, password, role) VALUES (%s, %s, %s)
+        ON CONFLICT (username) DO NOTHING;
+        """
+        cursor.executemany(insert_query, usuarios_data)
+        conn.commit()
+        print("Tabla de usuarios poblada exitosamente.")
+    except psycopg2.Error as e:
+        print("Error al poblar la tabla de usuarios:", e)
+    finally:
+        if conn:
+            conn.close()
+
+# Función para poblar la tabla de clientes
+def poblar_tabla_clientes():
+    clientes_data = [
+        ("carlos.p", "carlos", "tulipanes 23", "carlitosp@gmail.com"),
+        ("juannn", "juan", "rosas 1", "juaninn@gmail.com"),
+        ("anita", "ana", "pimientos 2", "anitanita@gmail.com"),
+        ("pedrito", "pedro", "pimientos 8", "pedropedropedro@gmail.com"),
+        ("luisa", "luisa", "las dalias 42", "gatosss1@gmail.com"),
+        ("javelo", "javier", "los platanos 1541", "javelo89@gmail.com"),
+        ("heu.remi", "remi", "los copihues 2257", "heuremi03@gmail.com"),
+        ("winteroh", "winter", "petunias 33", "invierno2@gmail.com"),
+        ("camilo.a", "camilo", "azucenas 21", "camilito@gmail.com"),
+        ("vixo.r", "vicente", "las torres 77", "vixovixo@gmail.com"),
+    ]
+
+    try:
+        conn = connection()
+        cursor = conn.cursor()
+        insert_query = """
+        INSERT INTO clientes (username, nombre, direccion, email) VALUES (%s, %s, %s, %s)
+        ON CONFLICT (username) DO NOTHING;
+        """
+        cursor.executemany(insert_query, clientes_data)
+        conn.commit()
+        print("Tabla de clientes poblada exitosamente.")
+    except psycopg2.Error as e:
+        print("Error al poblar la tabla de clientes:", e)
+    finally:
+        if conn:
+            conn.close()
+
+# Función para poblar la tabla de productos
+def poblar_tabla_productos():
+    productos_data = [
+        ("Laptop", "Laptop HP con 16GB RAM", 1200, 15),
+        ("Smartphone", "iPhone 12 Pro", 999, 30),
+        ("Tablet", "iPad Pro 11 pulgadas", 799, 20),
+        ("Monitor", "Monitor Dell 24 pulgadas", 300, 25),
+        ("Teclado", "Teclado mecánico Logitech", 120, 50),
+        ("Ratón", "Ratón inalámbrico Logitech", 50, 60),
+        ("Impresora", "Impresora multifunción HP", 150, 10),
+        ("Auriculares", "Auriculares Bluetooth Sony", 200, 40),
+        ("Altavoz", "Altavoz portátil JBL", 100, 35),
+        ("Cámara", "Cámara digital Canon", 500, 8),
+        ("Microondas", "Microondas Samsung", 150, 20),
+        ("Refrigerador", "Refrigerador LG", 800, 5),
+        ("Lavadora", "Lavadora Samsung", 600, 10),
+        ("Televisor", "Televisor Sony 50 pulgadas", 900, 7),
+        ("Consola", "Consola PlayStation 5", 499, 25),
+        ("Juego", "Videojuego FIFA 23", 60, 100),
+        ("Router", "Router WiFi TP-Link", 80, 45),
+        ("SSD", "Disco SSD Samsung 1TB", 150, 70),
+        ("Memoria RAM", "Memoria RAM Kingston 8GB", 40, 80),
+        ("Disco Duro", "Disco duro externo Seagate 2TB", 100, 55),
+    ]
+
+    try:
+        conn = connection()
+        cursor = conn.cursor()
+        insert_query = """
+        INSERT INTO productos (nombre, descripcion, precio, cantidad_stock) VALUES (%s, %s, %s, %s)
+        ON CONFLICT (nombre) DO NOTHING;
+        """
+        cursor.executemany(insert_query, productos_data)
+        conn.commit()
+        print("Tabla de productos poblada exitosamente.")
+    except psycopg2.Error as e:
+        print("Error al poblar la tabla de productos:", e)
+    finally:
+        if conn:
+            conn.close()
+
+# Función para poblar la tabla de ventas
+def poblar_tabla_ventas():
+    ventas_data = [
+        (1, "carlos.p", "Laptop", 1),
+        (2, "juannn", "Smartphone", 2),
+        (3, "anita", "Tablet", 1),
+        (4, "javelo", "Monitor", 1),
+        (5, "javelo", "Teclado", 2),
+        (6, "winteroh", "Ratón", 3),
+        (7, "heu.remi", "Impresora", 1),
+        (8, "javelo", "Auriculares", 2),
+    ]
+
+    try:
+        conn = connection()
+        cursor = conn.cursor()
+        insert_query = """
+        INSERT INTO ventas (id, cliente, producto, cantidad) VALUES (%s, %s, %s, %s)
+        ON CONFLICT (id) DO NOTHING;
+        """
+        cursor.executemany(insert_query, ventas_data)
+        conn.commit()
+        print("Tabla de ventas poblada exitosamente.")
+    except psycopg2.Error as e:
+        print("Error al poblar la tabla de ventas:", e)
+    finally:
+        if conn:
+            conn.close()
+
 #Funcion para verificar si la contraseña es válida
 def is_valid_password(password):
     # La contraseña debe tener entre 6 y 8 caracteres
@@ -570,4 +705,17 @@ def login():
             conn.close()
 
 if connection():
+    """
+    #Crear tablas:
+    create_users_table()
+    create_clientes_table()
+    create_products_table()
+    create_ventas_table()
+
+    #Poblar tablas:
+    poblar_tabla_usuarios()
+    poblar_tabla_clientes()
+    poblar_tabla_productos()
+    poblar_tabla_ventas()
+    """
     login()

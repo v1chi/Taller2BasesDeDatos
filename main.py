@@ -53,6 +53,9 @@ def create_products_table():
         print("Tabla de productos creada exitosamente.")
     except psycopg2.Error as e:
         print("Error al crear la tabla de productos:", e)
+    finally:
+        if conn:
+            conn.close()
 
 # Función para crear la tabla de ventas
 def create_ventas_table():
@@ -72,6 +75,9 @@ def create_ventas_table():
         print("Tabla de ventas creada exitosamente.")
     except psycopg2.Error as e:
         print("Error al crear la tabla de ventas:", e)
+    finally:
+        if conn:
+            conn.close()
 
 # Función para crear la tabla de clientes
 def create_clientes_table():
@@ -91,6 +97,9 @@ def create_clientes_table():
         print("Tabla de clientes creada exitosamente.")
     except psycopg2.Error as e:
         print("Error al crear la tabla de clientes:", e)
+    finally:
+        if conn:
+            conn.close()
 
 # Función para poblar la tabla de usuarios
 def poblar_tabla_usuarios():
@@ -533,6 +542,7 @@ def realizar_compra(user):
     except psycopg2.Error as e:
         print("Error al realizar la compra:", e)
 
+#Obtener cliente
 def obtener_cliente():
     try:
         cliente = input("Ingrese el nombre de usuario del cliente: ")
@@ -705,6 +715,7 @@ def login():
             conn.close()
 
 if connection():
+    #La primera vez que se ejecute el código, se deben quitar las comillas "" para crear las tablas y poblarlas, luego se deben volver a comentar
     """
     #Crear tablas:
     create_users_table()
